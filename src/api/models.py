@@ -1,7 +1,7 @@
 import enum
-from datetime import datetime
+from datetime import datetime, time
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import String, Boolean, Integer, Enum, DateTime, func, ForeignKey, Float
+from sqlalchemy import String, Boolean, Integer, Enum, DateTime, func, ForeignKey, Float, UniqueConstraint, Date
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 db = SQLAlchemy()
@@ -29,15 +29,14 @@ class User(db.Model):
     role: Mapped[UserRole] = mapped_column(Enum(UserRole), nullable=False)
     create_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now())
-    is_active: Mapped[bool] = mapped_column(Boolean(), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=True)
 
-    stylist: Mapped[list['Stylist']] = relationship(back_populates='user')
-    client: Mapped[list['Client']] = relationship(back_populates='userClient')
+    stylist: Mapped['Stylist'] = relationship(back_populates='user')
+    client: Mapped['Client'] = relationship(back_populates='userClient')
 
     def serialize(self):
         return {
             "id": self.id,
-
             "email": self.email,
         }
 
@@ -45,10 +44,10 @@ class User(db.Model):
 class Stylist(db.Model):
     __tablename__ = 'stylist'
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey('user.id'))
+    user_id: Mapped[int] = mapped_column(ForeignKey('user.id'), nullable=False)
     bio: Mapped[str] = mapped_column(String(500))
-    phone: Mapped[int] = mapped_column(Integer, nullable=False)
-    address: Mapped[float] = mapped_column(String(120), nullable=False)
+    phone: Mapped[str] = mapped_column(String(20), nullable=False)
+    address: Mapped[str] = mapped_column(String(120), nullable=False)
     latitude: Mapped[float] = mapped_column(Float, nullable=False)
     longitude: Mapped[float] = mapped_column(Float, nullable=False)
     profile_image: Mapped[str] = mapped_column(String, nullable=False)
@@ -57,7 +56,7 @@ class Stylist(db.Model):
 
     user: Mapped['User'] = relationship(back_populates='stylist')
     services: Mapped[list['Services']] = relationship(
-        back_populates='stylistServices')
+        back_populates='stylistServices', cascade='all, delete-orphan')
     availability: Mapped[list['Availability']] = relationship(
         back_populates='stylistAvailability')
     appointment: Mapped[list['Appointments']] = relationship(
@@ -71,9 +70,9 @@ class Stylist(db.Model):
 class Client(db.Model):
     __tablename__ = 'client'
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey('user.id'))
-    address: Mapped[str] = mapped_column(String(120), nullable=True)
-    phone: Mapped[int] = mapped_column(Integer, nullable=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey('user.id'), nullable=False)
+    address: Mapped[str] = mapped_column(String(120), nullable=False)
+    phone: Mapped[str] = mapped_column(String(20), nullable=True)
     create_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now())
 
@@ -89,7 +88,7 @@ class Client(db.Model):
 class Services(db.Model):
     __tablename__ = 'services'
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    stylist_id: Mapped[int] = mapped_column(ForeignKey('stylist.id'))
+    stylist_id: Mapped[int] = mapped_column(ForeignKey('stylist.id'), nullable=False)
     description: Mapped[str] = mapped_column(String(500), nullable=False)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     price: Mapped[float] = mapped_column(Float)
@@ -104,14 +103,15 @@ class Services(db.Model):
 
 
 class Availability(db.Model):
-    __tablename__ = 'services'
+    __tablename__ = 'availability'
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    stylist_id: Mapped[int] = mapped_column(ForeignKey('services.id'))
-    day_of_week: Mapped[str] = mapped_column(String(), nullable=False)
-    start_time: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now())
-    end_time: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now())
+    stylist_id: Mapped[int] = mapped_column(
+        ForeignKey('stylist.id'), nullable=False)
+    day_of_week: Mapped[int] = mapped_column(Integer, nullable=False)
+    start_time: Mapped[time] = mapped_column(
+        db.Time(timezone=True), nullable=True)
+    end_time: Mapped[time] = mapped_column(
+        db.Time(timezone=True), nullable=False)
 
     stylistAvailability: Mapped['Stylist'] = relationship(
         back_populates='availability')
@@ -120,11 +120,14 @@ class Availability(db.Model):
 class Appointments(db.Model):
     __tablename__ = 'appointments'
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    stylist_id: Mapped[int] = mapped_column(ForeignKey('stylist.id'))
-    client_id: Mapped[int] = mapped_column(ForeignKey('client.id'))
-    services_id: Mapped[int] = mapped_column(ForeignKey('services.id'))
+    stylist_id: Mapped[int] = mapped_column(
+        ForeignKey('stylist.id'), nullable=False)
+    client_id: Mapped[int] = mapped_column(
+        ForeignKey('client.id'), nullable=False)
+    services_id: Mapped[int] = mapped_column(
+        ForeignKey('services.id'), nullable=False)
     apointment_date: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now())
+        Date, nullable=False)
     status: Mapped[AppointmentStatus] = mapped_column(
         Enum(AppointmentStatus), nullable=False)
     price: Mapped[float] = mapped_column(Float)
@@ -143,12 +146,12 @@ class Appointments(db.Model):
     reviewaApointment: Mapped[list['Review']] = relationship(
         back_populates='appointmentReview')
 
-
 class Messages(db.Model):
+    __tablename__ = 'messages'
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    stylist_id: Mapped[int] = mapped_column(ForeignKey('stylist.id'))
-    client_id: Mapped[int] = mapped_column(ForeignKey('client.id'))
-    appointment_id: Mapped[int] = mapped_column(ForeignKey('appointments.id'))
+    stylist_id: Mapped[int] = mapped_column(ForeignKey('stylist.id'), nullable=False)
+    client_id: Mapped[int] = mapped_column(ForeignKey('client.id'), nullable=False)
+    appointment_id: Mapped[int] = mapped_column(ForeignKey('appointments.id'), nullable=False)
     content: Mapped[str] = mapped_column(String(500), nullable=False)
     is_read: Mapped[bool] = mapped_column(Boolean)
     create_at: Mapped[datetime] = mapped_column(
@@ -163,10 +166,14 @@ class Messages(db.Model):
 
 
 class Review(db.Model):
+    __tablename__ = 'review'
+    __table_args__ = (UniqueConstraint('appointment_id',
+                      name='only_review_per_appointment'),)
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    stylist_id: Mapped[int] = mapped_column(ForeignKey('stylist.id'))
-    client_id: Mapped[int] = mapped_column(ForeignKey('client.id'))
-    appointment_id: Mapped[int] = mapped_column(ForeignKey('appointments.id'))
+    stylist_id: Mapped[int] = mapped_column(ForeignKey('stylist.id'), nullable=False)
+    client_id: Mapped[int] = mapped_column(ForeignKey('client.id'), nullable=False)
+    appointment_id: Mapped[int] = mapped_column(ForeignKey('appointments.id'), nullable=False)
     rating: Mapped[int] = mapped_column(Integer)
     comment: Mapped[str] = mapped_column(String(500))
     create_at: Mapped[datetime] = mapped_column(
