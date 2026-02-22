@@ -50,7 +50,7 @@ class User(db.Model):
     is_active: Mapped[bool] = mapped_column(
         Boolean(), nullable=False, default=True)
 
-    provider: Mapped['Stylist'] = relationship(back_populates='user')
+    provider: Mapped['Provider'] = relationship(back_populates='user')
     client: Mapped['Client'] = relationship(back_populates='userClient')
 
     def serialize(self):
@@ -79,7 +79,7 @@ class Provider(db.Model):
     stylist: Mapped[list['Stylist']] = relationship(
         back_populates='provider_styl')
     services: Mapped[list['Services']] = relationship(
-        back_populates='stylistServices', cascade='all, delete-orphan')
+        back_populates='providerServices', cascade='all, delete-orphan')
     user: Mapped['User'] = relationship(back_populates='provider')
     payment_by: Mapped[list['Payment']] = relationship(
         back_populates='provider_payment')
@@ -105,7 +105,7 @@ class Stylist(db.Model):
     is_active: Mapped[bool] = mapped_column(Boolean)
 
     provider_styl: Mapped['Provider'] = relationship(back_populates='stylist')
-    services: Mapped[list['Services']] = relationship(
+    services_stylist: Mapped[list['StylistServices']] = relationship(
         back_populates='stylistServices', cascade='all, delete-orphan')
     availability: Mapped[list['Availability']] = relationship(
         back_populates='stylistAvailability')
@@ -155,6 +155,23 @@ class Services(db.Model):
         back_populates='servicesAppointment')
     favorite_serv: Mapped[list['Favorite']] = relationship(
         back_populates='service_fav')
+    stylist_unique: Mapped[list['StylistServices']] = relationship(
+        back_populates='services_styl')
+
+
+class StylistServices(db.Model):
+    __table_args__ = (UniqueConstraint("stylist_id", "services_id"),)
+    __tablename__ = 'stylistServices'
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    stylist_id: Mapped[int] = mapped_column(
+        ForeignKey('stylist.id'), nullable=False)
+    services_id: Mapped[int] = mapped_column(
+        ForeignKey('services.id'), nullable=False)
+
+    stylistServices: Mapped['Stylist'] = relationship(
+        back_populates='services_stylist')
+    services_styl: Mapped['Services'] = relationship(
+        back_populates='stylist_unique')
 
 
 class Availability(db.Model):
@@ -336,6 +353,8 @@ class StylistSpecialty(db.Model):
 
 
 class Favorite(db.Model):
+    __table_args__ = (UniqueConstraint(
+        "client_id", "provider_id", "service_id", name="unique_favorite"),)
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     provider_id: Mapped[int] = mapped_column(
         ForeignKey('provider.id'), nullable=True)
