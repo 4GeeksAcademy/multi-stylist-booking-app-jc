@@ -45,7 +45,7 @@ class User(db.Model):
     email: Mapped[str] = mapped_column(
         String(120), unique=True, nullable=False)
     password: Mapped[str] = mapped_column(nullable=False)
-    role: Mapped[UserRole] = mapped_column(Enum(UserRole), nullable=False)
+    role: Mapped[UserRole] = mapped_column(Enum(UserRole))
     create_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now())
     is_active: Mapped[bool] = mapped_column(

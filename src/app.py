@@ -11,6 +11,7 @@ from api.routes import api
 from api.admin import setup_admin
 from api.commands import setup_commands
 
+from flask_cors import CORS
 from flask_jwt_extended import create_access_token
 from flask_jwt_extended import get_jwt_identity
 from flask_jwt_extended import jwt_required
@@ -24,10 +25,14 @@ ENV = "development" if os.getenv("FLASK_DEBUG") == "1" else "production"
 static_file_dir = os.path.join(os.path.dirname(
     os.path.realpath(__file__)), '../dist/')
 app = Flask(__name__)
+CORS(app, origins="*")
 bcrypt = Bcrypt(app)
 
 
 app.url_map.strict_slashes = False
+app.config["JWT_SECRET_KEY"] = os.getenv('SUPER_SECRET_TOKEN')
+jwt = JWTManager(app)
+
 
 # database condiguration
 db_url = os.getenv("DATABASE_URL")
@@ -78,7 +83,7 @@ def serve_any_other_file(path):
     return response
 
 
-@app.route('/api/user/stylist/register', methods=['POST'])
+@app.route('/api/user/provider/register', methods=['POST'])
 def register_stylist():
     body = request.get_json(silent=True)
     if body is None:
@@ -98,13 +103,94 @@ def register_stylist():
 
     new_user.name = body['name']
     new_user.email = body['email']
-    new_user.role = UserRole.STYLIST
+    new_user.role = UserRole.PROVIDER
     new_user.is_active = True
     pw_hash = bcrypt.generate_password_hash(body['password']).decode('utf-8')
     new_user.password = pw_hash
     db.session.add(new_user)
     db.session.commit()
     return jsonify({'msg': 'User create succesfully'}), 200
+
+
+@app.route('/api/user/provider/login', methods=['POST'])
+def login_stylist():
+    body = request.get_json(silent=True)
+
+    requred_fields = ['email', 'password']
+    for fields in requred_fields:
+        if fields not in body:
+            return jsonify({'msg': 'this field is required'}), 400
+
+    user = User.query.filter_by(email=body['email']).first()
+    if user is None:
+        return jsonify({'msg': 'email or password is incorect'}), 400
+
+    is_hash_pw_correct = bcrypt.check_password_hash(
+        user.password, body['password'])
+    if is_hash_pw_correct == False:
+        return jsonify({'msg': 'email or password is incorect'}), 400
+
+    access_token = create_access_token(identity=user.email)
+    return jsonify({
+        'msg': 'login successfully',
+        'token': access_token,
+        'stylist_data': user.serialize()}), 200
+
+# this endpoint is for the clients
+
+
+@app.route('/api/client/register', methods=['POST'])
+def register_client():
+    body = request.get_json(silent=True)
+
+    required_field_client = ['name', 'email', 'password']
+    for field_client in required_field_client:
+        if field_client not in body:
+            return jsonify({'msg': 'this field is required'}), 400
+
+    user = User.query.filter_by(email=body['email']).first()
+
+    if user != None:
+        return jsonify({'msg': 'this email has already in account'}), 400
+
+    new_user = User()
+
+    new_user.name = body['name']
+    new_user.email = body['email']
+    new_user.role = UserRole.CLIENT
+    new_user.is_active = True
+    pw_hash = bcrypt.generate_password_hash(body['password']).decode('utf-8')
+    new_user.password = pw_hash
+    db.session.add(new_user)
+    db.session.commit()
+    return jsonify({'msg': 'User create succesfully'}), 200
+
+
+@app.route('/api/client/login', methods=['POST'])
+def login_client():
+    body = request.get_json(silent=True)
+
+    required_field_client = ['email', 'password']
+    for fields_client in required_field_client:
+        if fields_client not in body:
+            return jsonify({'msg': 'this field is required'}), 400
+
+    user_client_login = User.query.filter_by(email=body['email']).first()
+
+    if user_client_login is None:
+        return jsonify({'msg': 'incorect email or password'}), 400
+
+    is_hash_pw = bcrypt.check_password_hash(
+        user_client_login.password, body['password'])
+    if is_hash_pw == False:
+        return jsonify({'msg': 'incorect email or password'}), 400
+
+    access_token = create_access_token(identity=user_client_login.email)
+
+    return jsonify({'msg': 'login successfully',
+                    'token': access_token,
+                    'client_data': user_client_login.serialize()
+                    }), 200
 
 
 # this only runs if `$ python src/main.py` is executed
