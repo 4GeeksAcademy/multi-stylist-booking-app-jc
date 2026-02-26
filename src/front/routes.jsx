@@ -13,6 +13,8 @@ import { Login } from "./pages/Login";
 import { LoginProvider } from "./pages/LoginProvider";
 import { SignUpClient } from "./pages/SignUpClient";
 import { SignUpProvider } from "./pages/SignUpProvider";
+import { ProviderDashboard } from "./pages/dashboardProvider/ProviderDashboard"
+import { PrivateProviderRoute } from "./pages/dashboardProvider/PrivateProviderRoute"
 
 
 export const router = createBrowserRouter(
@@ -34,6 +36,16 @@ export const router = createBrowserRouter(
       <Route path="/loginprovider" element={<LoginProvider />} />
       <Route path="/signupclient" element={<SignUpClient />} />
       <Route path="/signupprovider" element={<SignUpProvider />} />
+
+
+      <Route
+        path="/providerdashboard"
+        element={
+          <PrivateProviderRoute>
+            <ProviderDashboard />
+          </PrivateProviderRoute>
+        }
+      />
 
     </Route>
   )
